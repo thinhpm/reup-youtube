@@ -1,18 +1,12 @@
-import cv2
 import os
 import requests
-from bs4 import BeautifulSoup
 import numpy as np
-import math
-import random
 import time
-import string
 import subprocess
-import re
 import json
 
 np.seterr(over='ignore')
-key_api = "AIzaSyB5iHS012M7mYUtJNb0QcbjuwcJFCNx-qw"
+key_api = "AIzaSyAdO-hmFHLaRgiARrMRNdpN9RqgYx_ulB4"
 
 pwd = os.getcwd()
 pwd = pwd + '/'
@@ -96,18 +90,43 @@ def isFirstUpload(stt_id):
 
 
 def get_file_upload():
-    filelist = os.listdir('output')
+    filelist = os.listdir('input')
 
     for fichier in filelist:
         if "input" in fichier:
-            return 'output/' + fichier
+            return fichier
 
     return False
+
+
+def get_ffmpeg(file_video, file_ffmpeg):
+    path_file = 'ffmpeg-files/' + file_ffmpeg
+    fo = open(path_file, "r")
+    lines = fo.readlines()
+
+    if len(lines) > 0:
+        string_process = lines[0]
+        string_process = string_process.replace("input.mp4", 'input/' + str(file_video))
+        string_process = string_process.replace("output.mp4", "output/" + str(file_video))
+
+        return string_process
+
+    return False
+
+
+def process_video(file_name):
+    string_ffmpeg = get_ffmpeg(file_name, 'text2.txt')
+    os.system(string_ffmpeg)
+
+    return 'output/' + file_name
 
 
 def hanlde(name_title, description, genres, stt_id):
     check = False
     file_name = get_file_upload()
+    temp_file_name = file_name
+    file_name = process_video(file_name)
+
     if file_name:
         print("Uploading...")
 
@@ -123,15 +142,15 @@ def hanlde(name_title, description, genres, stt_id):
         else:
             check = upload_youtube_and_check_out_number(name_title, description, genres, file_name, stt_id)
 
-    # os.remove(file_name)
+    os.remove('input/' + temp_file_name)
+    os.remove('output/' + temp_file_name)
 
     return check
 
 
 def download_video_from_youtube(id_video):
     print("Downloading...")
-    url = "youtube-dl -o output/input.%(ext)s https://www.youtube.com/watch?v=" + str(id_video)
-    print(url)
+    url = "youtube-dl -o input/input.%(ext)s https://www.youtube.com/watch?v=" + str(id_video)
     os.system(url)
 
 
@@ -193,4 +212,3 @@ if __name__ == '__main__':
 
     for item_web in arr_website_avail:
         get_list_video(item_web, stt_id)
-
