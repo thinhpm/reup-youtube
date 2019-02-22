@@ -4,6 +4,7 @@ import numpy as np
 import time
 import subprocess
 import json
+import re
 
 np.seterr(over='ignore')
 key_api = "AIzaSyAdO-hmFHLaRgiARrMRNdpN9RqgYx_ulB4"
@@ -99,7 +100,7 @@ def get_file_upload():
     return False
 
 
-def get_ffmpeg(file_video, file_ffmpeg):
+def get_ffmpeg(file_video, file_ffmpeg, stt_id):
     path_file = 'ffmpeg-files/' + file_ffmpeg
     fo = open(path_file, "r")
     lines = fo.readlines()
@@ -108,24 +109,58 @@ def get_ffmpeg(file_video, file_ffmpeg):
         string_process = lines[0]
         string_process = string_process.replace("input.mp4", 'input/' + str(file_video))
         string_process = string_process.replace("output.mp4", "output/" + str(file_video))
+        string_process = string_process.replace("temp/hh.png", str(stt_id) + "/hh.png")
 
         return string_process
 
     return False
 
 
-def process_video(file_name):
-    string_ffmpeg = get_ffmpeg(file_name, 'text2.txt')
+def process_video(file_name, stt_id):
+    string_ffmpeg = get_ffmpeg(file_name, 'text2.txt', stt_id)
     os.system(string_ffmpeg)
 
     return 'output/' + file_name
+
+
+def replace_name_title(name_title, stt_id):
+    path_file = str(stt_id) + '/stt-video.txt'
+    fo = open(path_file, "r")
+    lines = fo.readlines()
+    fo.close()
+    stt_video = 1
+    has_change = False
+
+    if len(lines) > 0:
+        stt_video = int(lines[0]) + 1
+
+    name_title = name_title.replace("2018", "2019")
+    temp_name = name_title
+
+    arr_stt = re.findall(r'#(.*?) ', temp_name)
+
+    for stt in arr_stt:
+        if stt.isdigit() and stt != 2019 and stt != 2018:
+            has_change = True
+            stt_need_change = stt
+
+            name_title = name_title.replace(stt_need_change, str(stt_video))
+
+    if has_change:
+        fo = open(path_file, "w")
+        fo.write(str(stt_video))
+        fo.close()
+
+    return name_title
 
 
 def hanlde(name_title, description, genres, stt_id):
     check = False
     file_name = get_file_upload()
     temp_file_name = file_name
-    file_name = process_video(file_name)
+    file_name = process_video(file_name, stt_id)
+    name_title = replace_name_title(name_title, stt_id)
+    description = name_title
 
     if file_name:
         print("Uploading...")
@@ -159,8 +194,14 @@ def get_tags(id_video):
 
     req = requests.get(url)
     items = json.loads(req.content)
+    tags = ''
 
-    list_tag = ','.join(items['items'][0]['snippet']['tags'])
+    try:
+        tags = items['items'][0]['snippet']['tags']
+    except KeyError as e:
+        print('I got a KeyError - reason "%s"' % str(e))
+
+    list_tag = ','.join(tags)
 
     return list_tag
 
@@ -179,11 +220,14 @@ def get_list_video(channel_id, stt_id):
     for item in list_item['items']:
         title = item['snippet']['title']
         description = title
-
-        id_video = item['contentDetails']['upload']['videoId']
+        try:
+            id_video = item['contentDetails']['upload']['videoId']
+        except KeyError:
+            id_video = item['contentDetails']['playlistItem']['resourceId']['videoId']
 
         if check_exist_chapt(channel_id, id_video, stt_id):
             tags = get_tags(id_video)
+
             download_video_from_youtube(id_video)
 
             check = hanlde(title, description, tags, stt_id)
@@ -191,6 +235,7 @@ def get_list_video(channel_id, stt_id):
             if check:
                 save_to_file(channel_id, id_video, stt_id)
                 print("Done")
+                return 1
                 time.sleep(150)
 
 
